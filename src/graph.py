@@ -54,9 +54,9 @@ def connected_component(G):
     attrStore = {}
     attrStore['cid'] = cid
     for v in G:
-        attrStore['vid'] = v
-        cid[v] = v
         if not marked[v]:
+            attrStore['vid'] = v
+            cid[v] = v
             dfsFn(G, v, marked, path_from, attrStore)
     return cid, path_from
 
