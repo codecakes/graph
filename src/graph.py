@@ -30,7 +30,7 @@ def bfs(G, src_node, marked, path_from):
         for connected_node in G[node]:
             if marked.get(connected_node, 0) == 0:
                 path_from[connected_node] = node
-                Q.appendleft(connected_node)'
+                Q.appendleft(connected_node)
     return
 
 
