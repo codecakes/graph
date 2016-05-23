@@ -12,30 +12,66 @@ def rec_edge(G, E, Elo, Ehi):
         G.addEdge(v1, v2)
 
 # dfs decorator
-def dfs_connected(fn, attrStore = None):
-    cid = attrStore['cid']
-    vid = attrStore['vid']
-    def closure(*args):
-        G, src_node, marked, path_from, _ = args
-        cid[src_node] = vid
-        # dfs(G, src_node, marked, path_from)
-        fn(G, src_node, marked, path_from)
-    return closure
+class dfsDecorate(object):
 
-def dfs(G, src_node, marked, path_from):
-    '''depth first search on a graph'''
-    # path_from = [None] * len(G.V)
-    marked = marked or {}
-    for connected_node in G[src_node]:
-        if marked.get(connected_node, 0) == 0:
-            path_from[connected_node] = src_node
-            dfs(G, connected_node, marked, path_from)
-    marked[src_node] = 1
-    return
+    def __init__(self, attr, cid):
+        self.attr = attr
+        self.cid = cid
+        self.f = None
+        self.src_node = self.attr['vid']
 
-def dfsFn(G, src_node, marked, path_from, attrStore):
+    def __call__(self, f):
+        self.f = f
+        def wrap(*args):
+            G, src_node, marked, path_from = args
+            self.cid[src_node] = self.src_node
+            self.f(*args)
+        return wrap
+
+# see dfsDecorate above
+# def dfs_connected(fn, attrStore = None):
+#     cid = attrStore['cid']
+#     vid = attrStore['vid']
+#     def closure(*args):
+#         G, src_node, marked, path_from, _ = args
+#         cid[src_node] = vid
+#         # dfs(G, src_node, marked, path_from)
+#         fn(G, src_node, marked, path_from)
+#     return closure
+
+# TODO: Convert this into a class like https://stackoverflow.com/questions/37393287/optionally-use-decorators
+class dfsClass(object):
+
+    def __init__(self, attr, decoBool):
+        self.attr = attr
+        self.cid = attr['cid']
+        self.decoBool = decoBool
+
+    def __call__(self, *args):
+        if self.decoBool:
+            fn = dfsDecorate(self.attr, self.cid)
+            fn = fn(self.dfs)
+            return fn(*args)
+        else:
+            return fn(*args)
+
+    def dfs(self, G, src_node, marked, path_from):
+        '''depth first search on a graph'''
+        # path_from = [None] * len(G.V)
+        # marked = marked or {}
+        for connected_node in G[src_node]:
+            if marked.get(connected_node, 0) == 0:
+                path_from[connected_node] = src_node
+                # dfs(G, connected_node, marked, path_from)
+                dfs = dfsClass(self.attr, self.decoBool)
+                dfs(G, connected_node, marked, path_from)
+        marked[src_node] = 1
+        return
+
+def dfsFn(G, src_node, marked, path_from, attrStore, decoBool=True):
+    dfs = dfsClass(attrStore, decoBool)
     # like @dfs_connected but do it manually
-    dfs = dfs_connected(dfs, attrStore)
+    # dfs = dfs_connected(dfs, attrStore)
     dfs(G, src_node, marked, path_from)
 
 def connected_component(G):
@@ -47,10 +83,11 @@ def connected_component(G):
         - path_from: Vertiex index redirecting to where the edge came from
     '''
     marked = defaultdict(int)
-    # stores where it is coming from
-    path_from = [None] * len(G.V)
+    ln = len(G.V)
+    # stores incoming edge. from index value(vertex, where it is coming from) to index(target vertex)
+    path_from = [None] * ln
     # stores the original vertex of a singly connected graph component to which vertex/node v_i belongs to in v_i index
-    cid = [None] * len(G.V)
+    cid = [None] * ln
     attrStore = {}
     attrStore['cid'] = cid
     for v in G:
@@ -79,19 +116,25 @@ def bfs(G, src_node, marked, path_from):
 # if there is an edge from v to w or is w in the list of nodes connected to v
 def has_edge(G, v, w): return (w in G[v]) and (v in G[w])
 
+L = list
+
 class Graph(object):
 
-    L = list
     def __init__(self, V=None, E=None):
         self.V = V or []
         self.E = defaultdict(L)
         self.cid = None
         self.connected_path_from = None
-        # populate graph
-        if E:
-            rec_edge(self, E, 0, len(self.E)-1)
-            self.cid, self.connected_path_from = connected_component(self)
+        self.edges = E
 
+
+    def populate_graph(self):
+        if self.edges:
+            rec_edge(self, self.edges, 0, len(self.edges)-1)
+
+    def find_connected_path(self):
+        if self.edges:
+            self.cid, self.connected_path_from = connected_component(self)
 
     def __getitem__(self, v):
         return self.E[v]
@@ -108,3 +151,7 @@ class Graph(object):
             return
 
 
+class DiGraph(Graph):
+
+    def addEdge(self, srcNode, targetNode):
+        self[srcNode].append(targetNode)
